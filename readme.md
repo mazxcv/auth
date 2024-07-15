@@ -56,3 +56,6 @@ protoc -I proto proto/sso/sso.proto --go_out=./gen/go/ --go_opt=paths=source_rel
 |--storage.......................Файлы хранилища, например, SQLite базы данных
 |--tests.........................Функциональные тесты
 
+# Config 
+для превращения yaml-структуры 
+go get -u github.com/ilyakaznacheev/cleanenv

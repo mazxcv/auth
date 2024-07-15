@@ -1,8 +1,15 @@
-package sso
+package main
+
+import (
+	"fmt"
+	"sso/internal/config"
+)
 
 // собирает в себе все модули
 func main() {
-	// TODO: Инициализировать объект конфига
+	cfg := config.MustLoad()
+
+	fmt.Println(cfg)
 
 	// TODO: Инициализировать логгер
 
