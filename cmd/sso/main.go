@@ -3,8 +3,10 @@ package main
 import (
 	"log/slog"
 	"os"
+	"os/signal"
 	"sso/internal/app"
 	"sso/internal/config"
+	"syscall"
 )
 
 // собирает в себе все модули
@@ -16,11 +18,21 @@ func main() {
 
 	application := app.New(log, cfg.GRPC.Port, cfg.StoragePath, cfg.TokenTTL)
 
-	application.GRPCSrv.MustRun()
+	go application.GRPCSrv.MustRun()
 
 	// TODO: Инициализировать  приложение (/app)
 
 	// TODO: запустить gRPC-сервер приложения
+
+	// graceful shutdown
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
+
+	// чтение из канала блокирующая операция,  пока он пуст заставит висеть пока что-то туда не придет,
+	sign := <-stop
+	log.Info("stoppping application", slog.String("signal", sign.String()))
+	application.GRPCSrv.Stop()
+	log.Info("Application stop")
 }
 
 const (
