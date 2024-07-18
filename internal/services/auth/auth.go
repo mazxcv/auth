@@ -2,9 +2,15 @@ package auth
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"sso/internal/domain/models"
+	"sso/internal/lib/jwt"
+	"sso/internal/storage"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 type Auth struct {
@@ -24,13 +30,17 @@ type UserSaver interface {
 }
 
 type UserProvider interface {
-	User(ctx context.Context, UserID int64) (models.User, error)
+	User(ctx context.Context, email string) (models.User, error)
 	IsAdmin(ctx context.Context, UserID int64) (bool, error)
 }
 
 type AppProvider interface {
 	App(ctx context.Context, appID int) (models.App, error)
 }
+
+var (
+	ErrInvalidCredentials = errors.New("invalid credentials")
+)
 
 // New returns a new instance of the Auth service
 func New(
@@ -57,9 +67,46 @@ func (a *Auth) Login(
 	ctx context.Context,
 	email string,
 	password string,
-	addID int,
+	appId int64,
 ) (string, error) {
-	panic("not implemented")
+	const op = "auth.Login"
+	log := a.log.With(
+		slog.String("op", op),
+	)
+
+	log.Info("attempting to login user")
+	user, err := a.userProvider.User(ctx, email)
+	if err != nil {
+		if errors.Is(err, storage.ErrUserNotFound) {
+			log.Warn("User not found: " + err.Error())
+			return "", fmt.Errorf("%s, %w", op, ErrInvalidCredentials)
+		}
+
+		log.Error("failed to get User: " + err.Error())
+
+		return "", fmt.Errorf("%s: %w", op, err)
+	}
+
+	if err := bcrypt.CompareHashAndPassword(user.PassHash, []byte(password)); err != nil {
+		log.Info("Invalid credentials: " + err.Error())
+		return "", fmt.Errorf("%s: %w", op, ErrInvalidCredentials)
+	}
+
+	app, err := a.appProvider.App(ctx, int(appId))
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", op, ErrInvalidCredentials)
+	}
+
+	log.Info("User loggen successfully")
+
+	token, err := jwt.NewToken(user, app, a.tokenTTL)
+	if err != nil {
+		log.Error("failed to generate: " + err.Error())
+		return "", fmt.Errorf("%s: %w", op, err)
+	}
+
+	return token, nil
+
 }
 
 // RegisterNewUser registers new user in the system and returns user ID
@@ -70,13 +117,48 @@ func (a *Auth) RegisterNewUser(
 	email string,
 	password string,
 ) (int64, error) {
-	panic("not implemented")
+	const op = "auth.RegisterNewUser"
+	log := a.log.With(
+		slog.String("op", op),
+	)
+	log.Info("register new user")
+
+	passHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		log.Error("failed to generate password hash: " + err.Error())
+
+		return 0, fmt.Errorf("%s: %w", op, err)
+	}
+
+	id, err := a.userSaver.SaveUser(ctx, email, passHash)
+	if err != nil {
+		log.Error("failed to save user: " + err.Error())
+
+		return 0, fmt.Errorf("%s: %w", op, err)
+	}
+
+	log.Info("new user registered")
+
+	return id, nil
 }
 
 // IsAdmin check if user is admin
 func (a *Auth) IsAdmin(
 	ctx context.Context,
-	addID int,
+	userID int64,
 ) (bool, error) {
-	panic("not implemented")
+	const op = "auth.IsAdmin"
+	log := a.log.With(
+		slog.String("op", op),
+	)
+	log.Info("checking if user is admin")
+
+	isAdmin, err := a.userProvider.IsAdmin(ctx, userID)
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+
+	log.Info("checked if user is admin", slog.Bool("is_admin", isAdmin))
+
+	return isAdmin, nil
 }
