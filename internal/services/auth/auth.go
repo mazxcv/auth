@@ -40,6 +40,8 @@ type AppProvider interface {
 
 var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
+	ErrAppNotFound        = errors.New("Application not found")
+	ErrUserExists         = errors.New("User already exists")
 )
 
 // New returns a new instance of the Auth service
@@ -84,7 +86,7 @@ func (a *Auth) Login(
 
 		log.Error("failed to get User: " + err.Error())
 
-		return "", fmt.Errorf("%s: %w", op, err)
+		return "", fmt.Errorf("#{op}: #{err}")
 	}
 
 	if err := bcrypt.CompareHashAndPassword(user.PassHash, []byte(password)); err != nil {
@@ -102,7 +104,7 @@ func (a *Auth) Login(
 	token, err := jwt.NewToken(user, app, a.tokenTTL)
 	if err != nil {
 		log.Error("failed to generate: " + err.Error())
-		return "", fmt.Errorf("%s: %w", op, err)
+		return "", fmt.Errorf("#{op}: #{err}")
 	}
 
 	return token, nil
@@ -127,14 +129,18 @@ func (a *Auth) RegisterNewUser(
 	if err != nil {
 		log.Error("failed to generate password hash: " + err.Error())
 
-		return 0, fmt.Errorf("%s: %w", op, err)
+		return 0, fmt.Errorf("#{op}: #{err}")
 	}
 
 	id, err := a.userSaver.SaveUser(ctx, email, passHash)
 	if err != nil {
+		if errors.Is(err, storage.ErrUserExists) {
+			log.Warn("User already exists")
+			return 0, fmt.Errorf("%s: %w", op, ErrUserExists)
+		}
 		log.Error("failed to save user: " + err.Error())
 
-		return 0, fmt.Errorf("%s: %w", op, err)
+		return 0, fmt.Errorf("#{op}: #{err}")
 	}
 
 	log.Info("new user registered")
@@ -155,10 +161,12 @@ func (a *Auth) IsAdmin(
 
 	isAdmin, err := a.userProvider.IsAdmin(ctx, userID)
 	if err != nil {
-		return false, fmt.Errorf("%s: %w", op, err)
+		if errors.Is(err, storage.ErrAppNotFound) {
+			log.Warn("user not found")
+			return false, fmt.Errorf("%s: %w", op, ErrAppNotFound)
+		}
+		return false, fmt.Errorf("#{op}: #{err}")
 	}
-
-	log.Info("checked if user is admin", slog.Bool("is_admin", isAdmin))
 
 	return isAdmin, nil
 }
