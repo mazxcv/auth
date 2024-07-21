@@ -42,6 +42,7 @@ var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrAppNotFound        = errors.New("application not found")
 	ErrUserExists         = errors.New("user already exists")
+	ErrUserNotFound       = errors.New("user not found")
 )
 
 // New returns a new instance of the Auth service
@@ -69,7 +70,7 @@ func (a *Auth) Login(
 	ctx context.Context,
 	email string,
 	password string,
-	appId int64,
+	appId int,
 ) (string, error) {
 	const op = "auth.Login"
 	log := a.log.With(
@@ -90,16 +91,17 @@ func (a *Auth) Login(
 	}
 
 	if err := bcrypt.CompareHashAndPassword(user.PassHash, []byte(password)); err != nil {
-		log.Info("Invalid credentials: " + err.Error())
+		log.Warn("Invalid credentials: " + err.Error())
 		return "", fmt.Errorf("%s: %w", op, ErrInvalidCredentials)
 	}
 
 	app, err := a.appProvider.App(ctx, int(appId))
 	if err != nil {
-		return "", fmt.Errorf("%s: %w", op, ErrInvalidCredentials)
+		log.Warn("App not found" + err.Error())
+		return "", fmt.Errorf("%s: %w", op, ErrAppNotFound)
 	}
 
-	log.Info("User loggen successfully")
+	log.Info("User logged successfully")
 
 	token, err := jwt.NewToken(user, app, a.tokenTTL)
 	if err != nil {

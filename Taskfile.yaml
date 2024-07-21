@@ -7,3 +7,11 @@ tasks:
     desc: "migrate database"
     cmds:
       - go run ./cmd/migrator --storage-path=./storage/sso.db --migration-path=./migrations 
+  migrate_test:
+    desc: "migrate test-database"
+    cmds:
+      - go run ./cmd/migrator --storage-path=./storage/sso.db --migration-path=./tests/migrations --migration-table=migration_test
+  start:
+    desc: "run application"
+    cmds:
+      - go run cmd/sso/main.go --config=./config/local.yaml

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"sso/internal/services/auth"
-	"sso/internal/storage"
 
 	ssov1 "github.com/mazxcv/protos/gen/go/sso"
 	"google.golang.org/grpc"
@@ -17,7 +16,7 @@ type Auth interface {
 		ctx context.Context,
 		email string,
 		password string,
-		appId int64,
+		appId int,
 	) (token string, err error)
 
 	RegisterNewUser(
@@ -54,10 +53,10 @@ func (s *serverAPI) Login(
 		return nil, err
 	}
 	// TODO implement auth service
-	token, err := s.auth.Login(ctx, req.GetEmail(), req.GetPassword(), int64(req.GetAppId()))
+	token, err := s.auth.Login(ctx, req.GetEmail(), req.GetPassword(), int(req.GetAppId()))
 	if err != nil {
 		if errors.Is(err, auth.ErrInvalidCredentials) {
-			return nil, status.Error(codes.InvalidArgument, "internal error")
+			return nil, status.Error(codes.InvalidArgument, "invalid email or password")
 		}
 		return nil, status.Error(codes.Internal, "internal error")
 	}
@@ -77,7 +76,7 @@ func (s *serverAPI) Register(
 	}
 	UserID, err := s.auth.RegisterNewUser(ctx, req.GetEmail(), req.GetPassword())
 	if err != nil {
-		if errors.Is(err, storage.ErrUserExists) {
+		if errors.Is(err, auth.ErrUserExists) {
 			return nil, status.Error(codes.AlreadyExists, "user already exists")
 		}
 		return nil, status.Error(codes.Internal, "internal error")
@@ -100,7 +99,7 @@ func (s *serverAPI) IsAdmin(
 
 	isAdmin, err := s.auth.IsAdmin(ctx, req.GetUserId())
 	if err != nil {
-		if errors.Is(err, storage.ErrUserNotFound) {
+		if errors.Is(err, auth.ErrUserNotFound) {
 			return nil, status.Error(codes.NotFound, "user not found")
 		}
 		return nil, status.Error(codes.Internal, "internal error")
@@ -113,7 +112,7 @@ func (s *serverAPI) IsAdmin(
 
 func validateLogin(req *ssov1.LoginRequest) error {
 	if req.GetEmail() == "" {
-		return status.Error(codes.InvalidArgument, "email not is empty")
+		return status.Error(codes.InvalidArgument, "email is required")
 	}
 
 	if req.GetPassword() == "" {
@@ -129,7 +128,7 @@ func validateLogin(req *ssov1.LoginRequest) error {
 
 func validateRegister(req *ssov1.RegisterRequest) error {
 	if req.GetEmail() == "" {
-		return status.Error(codes.InvalidArgument, "email not is empty")
+		return status.Error(codes.InvalidArgument, "email is required")
 	}
 
 	if req.GetPassword() == "" {
