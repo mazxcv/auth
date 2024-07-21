@@ -1,0 +1,9 @@
+# See https://taskfile.dev.api
+
+version: "3"
+
+tasks:
+  migrate:
+    desc: "migrate database"
+    cmds:
+      - go run ./cmd/migrator --storage-path=./storage/sso.db --migration-path=./migrations 
