@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS users
 
 create index if not EXISTS idx_email on users(email);
 
-create TABLE if not exists apps 
+create TABLE if not exists app 
 (
     id integer primary key,
     name text not null unique,
