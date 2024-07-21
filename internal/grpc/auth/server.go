@@ -17,7 +17,7 @@ type Auth interface {
 		ctx context.Context,
 		email string,
 		password string,
-		appId int,
+		appId int64,
 	) (token string, err error)
 
 	RegisterNewUser(
@@ -54,7 +54,7 @@ func (s *serverAPI) Login(
 		return nil, err
 	}
 	// TODO implement auth service
-	token, err := s.auth.Login(ctx, req.GetEmail(), req.GetPassword(), int(req.GetAppId()))
+	token, err := s.auth.Login(ctx, req.GetEmail(), req.GetPassword(), int64(req.GetAppId()))
 	if err != nil {
 		if errors.Is(err, auth.ErrInvalidCredentials) {
 			return nil, status.Error(codes.InvalidArgument, "internal error")
